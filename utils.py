@@ -9,7 +9,7 @@ def fetch_data(tickers, start_date, end_date):
     for ticker in tickers:
         try:
             data[ticker] = si.get_data(ticker, start_date=start_date, end_date=end_date)
-            data[ticker] = data[ticker]['adjclose']  # Only keep adjusted close
+            data[ticker] = data[ticker][['adjclose', 'close']]  # Keep adjusted close and close
         except Exception as e:
             print(f"Error fetching data for {ticker}: {e}")
             continue
@@ -47,3 +47,19 @@ def calculate_performance_metrics(returns, risk_free_rate=0.0):
 def calculate_correlation_matrix(returns):
     """Calculates the correlation matrix of returns."""
     return returns.corr()
+
+def identify_risk_regime(spy_data, short_ma_length, long_ma_length, vix_data, vix_threshold):
+    """Identifies risk-on/risk-off regimes based on moving averages and VIX."""
+    spy_data['Short_MA'] = spy_data['adjclose'].rolling(window=short_ma_length).mean()
+    spy_data['Long_MA'] = spy_data['adjclose'].rolling(window=long_ma_length).mean()
+    spy_data['Regime'] = 0  # 0: Neutral
+    spy_data.loc[spy_data['Short_MA'] > spy_data['Long_MA'], 'Regime'] = 1  # 1: Risk-On
+    spy_data.loc[spy_data['Short_MA'] < spy_data['Long_MA'], 'Regime'] = -1 # -1: Risk-Off
+
+    #VIX check
+    spy_data['VIX'] = vix_data['close']
+    spy_data.loc[spy_data['VIX'] > vix_threshold, 'Regime'] = -1
+
+    spy_data.dropna(inplace=True) #Drop NaN values after MA calculation
+
+    return spy_data
