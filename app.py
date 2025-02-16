@@ -4,8 +4,8 @@ import yahoo_fin.stock_info as si
 import plotly.graph_objects as go
 import numpy as np
 
-st.title("BTC/SPY Allocation Strategy Backtest Comparison")
-st.write("Compares a BTC/SPY MA strategy with 20% BTC cap and SPY MA risk reduction against 100% SPY and 100% BTC benchmarks.")
+st.title("BTC/SPY Independent Allocation Strategy Backtest")
+st.write("Compares a BTC/SPY independent allocation strategy against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
@@ -72,7 +72,7 @@ cumulative_values_benchmark_spy = [portfolio_value_benchmark_spy]
 cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc]
 
 trades_data = [] # List to store trade information
-current_allocation = "100% SPY" # Initial allocation
+current_allocation = "100% SPY / 0% BTC" # Initial allocation
 annotations = [] # List to store annotations for the chart
 
 
@@ -88,32 +88,21 @@ for i in range(1, len(data)):
     spy_return = today['SPY'] / yesterday['SPY'] - 1
     btc_return = today['BTC'] / yesterday['BTC'] - 1
 
-    # --- Strategy Allocation Logic ---
-    spy_risk_off = spy_close_today < spy_ma_20_yesterday # Check if SPY is below its 20-day MA
-    btc_ratio_signal = ratio_today > ma_20_yesterday_ratio # Check BTC/SPY ratio signal
+    # --- Independent Allocation Logic ---
+    # SPY Allocation
+    if spy_close_today < spy_ma_20_yesterday:
+        strategy_allocation_spy = 0.5  # 50% SPY
+    else:
+        strategy_allocation_spy = 1.0  # 100% SPY
 
-    if spy_risk_off: # SPY Risk-Off Condition
-        if btc_ratio_signal:
-            # Reduced allocation, BTC capped at 20% of the *active* allocation (which is 50% of total)
-            strategy_allocation_spy = 0.5 * 0.8  # 40% SPY
-            strategy_allocation_btc = 0.5 * 0.2  # 10% BTC
-            new_allocation = "40% SPY / 10% BTC (Risk-Off)"
-        else:
-            # Reduced allocation, 100% to SPY within the active allocation (which is 50% of total)
-            strategy_allocation_spy = 0.5 * 1.0  # 50% SPY
-            strategy_allocation_btc = 0.0        # 0% BTC
-            new_allocation = "50% SPY (Risk-Off)"
-    else: # SPY Risk-On Condition
-        if btc_ratio_signal:
-            # BTC capped at 20%
-            strategy_allocation_spy = 0.8
-            strategy_allocation_btc = 0.2
-            new_allocation = "80% SPY / 20% BTC"
-        else:
-            # 100% SPY
-            strategy_allocation_spy = 1.0
-            strategy_allocation_btc = 0.0
-            new_allocation = "100% SPY"
+    # BTC Allocation
+    if ratio_today > ma_20_yesterday_ratio:
+        strategy_allocation_btc = 0.2  # 20% BTC
+    else:
+        strategy_allocation_btc = 0.0  # 0% BTC
+
+    new_allocation = f"{int(strategy_allocation_spy * 100)}% SPY / {int(strategy_allocation_btc * 100)}% BTC"
+
 
     if new_allocation != current_allocation: # Allocation switch detected
         trades_data.append({
@@ -148,7 +137,7 @@ cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, in
 # --- Plotting ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
-                         mode='lines', name='BTC/SPY MA Strategy (20% BTC Cap, SPY MA Risk-Off)'))
+                         mode='lines', name='Independent BTC/SPY MA Strategy'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
                          mode='lines', name='100% SPY Benchmark'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
@@ -171,7 +160,7 @@ benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data
 
 
 performance_data = {
-    'Strategy': ['BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
+    'Strategy': ['Independent BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
     'CAGR': [
         calculate_cagr(cumulative_returns_strategy),
         calculate_cagr(cumulative_returns_benchmark_spy),
@@ -210,7 +199,7 @@ else:
 st.subheader("Final Portfolio Value")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
+    st.metric("Independent BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
 with col2:
     st.metric("100% SPY Benchmark", value=f"${portfolio_value_benchmark_spy:,.2f}")
 with col3:
