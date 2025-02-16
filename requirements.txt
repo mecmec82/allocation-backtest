@@ -2,3 +2,5 @@ pandas
 numpy
 yahoo_fin
 scipy
+streamlit
+plotly
