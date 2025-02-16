@@ -84,6 +84,7 @@ cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc]
 
 trades_data = [] # List to store trade information
 current_allocation = f"{int(max_spy_allocation * 100)}% SPY / 0% BTC" # Initial allocation based on max_spy
+final_allocation = current_allocation # Initialize final allocation
 annotations = [] # List to store annotations for the chart
 
 
@@ -132,6 +133,7 @@ for i in range(1, len(data)):
         annotations.append(dict(x=today.name, y=cumulative_values_strategy[-1], xref="x", yref="y",
                             text=f"Switch to<br>{new_allocation}", showarrow=True, arrowhead=1, arrowcolor="blue", bgcolor="white"))
         current_allocation = new_allocation # Update current allocation
+    final_allocation = new_allocation # Update final allocation at each step, so last value after loop is final
 
     strategy_daily_return = (strategy_allocation_spy * spy_return) + (strategy_allocation_btc * btc_return)
     strategy_returns.append(strategy_daily_return)
@@ -152,6 +154,9 @@ for i in range(1, len(data)):
 cumulative_returns_strategy = pd.Series(cumulative_values_strategy, index=data.index)
 cumulative_returns_benchmark_spy = pd.Series(cumulative_values_benchmark_spy, index=data.index)
 cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, index=data.index)
+
+# --- Display Current Allocation Banner ---
+st.markdown(f"<h2 style='text-align: center; color: blue;'>Current Allocation: {final_allocation}</h2>", unsafe_allow_html=True)
 
 # --- Plotting ---
 fig = go.Figure()
