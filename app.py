@@ -5,8 +5,6 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import date, timedelta
 
-st.write("Compares a customizable BTC/SPY allocation strategy against 100% SPY and 100% BTC benchmarks.")
-
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
 
