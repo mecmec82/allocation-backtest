@@ -4,14 +4,25 @@ import yahoo_fin.stock_info as si
 import plotly.graph_objects as go
 import numpy as np
 
-st.title("BTC/SPY Capped Allocation Strategy Backtest")
-st.write("Compares a BTC/SPY capped allocation strategy (max 100%) against 100% SPY and 100% BTC benchmarks.")
+st.title("Customizable BTC/SPY Allocation Strategy Backtest")
+st.write("Compares a customizable BTC/SPY allocation strategy against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 initial_investment = st.sidebar.number_input("Initial Investment", value=10000)
+
+st.sidebar.header("Strategy Parameters")
+ma_period = st.sidebar.number_input("Moving Average Period", min_value=5, max_value=200, value=20, step=5)
+min_spy_allocation_percent = st.sidebar.slider("Min SPY Allocation (%)", min_value=0, max_value=100, value=50, step=10)
+max_spy_allocation_percent = st.sidebar.slider("Max SPY Allocation (%)", min_value=0, max_value=100, value=100, step=10)
+max_btc_allocation_percent = st.sidebar.slider("Max BTC Allocation (%)", min_value=0, max_value=100, value=20, step=5)
+
+min_spy_allocation = min_spy_allocation_percent / 100.0
+max_spy_allocation = max_spy_allocation_percent / 100.0
+max_btc_allocation = max_btc_allocation_percent / 100.0
+
 
 # --- Data Fetching Function ---
 @st.cache_data(ttl=3600)
@@ -57,9 +68,9 @@ if data.empty:
     st.error("No overlapping data for SPY and BTC-USD within the selected date range.")
     st.stop()
 
-data['SPY_MA_20'] = data['SPY_Close_For_MA'].rolling(window=20).mean() # SPY 20-day MA
+data[f'SPY_MA_{ma_period}'] = data['SPY_Close_For_MA'].rolling(window=ma_period).mean() # SPY MA
 data['BTC_SPY_Ratio'] = data['BTC'] / data['SPY']
-data['Ratio_MA_20'] = data['BTC_SPY_Ratio'].rolling(window=20).mean()
+data[f'Ratio_MA_{ma_period}'] = data['BTC_SPY_Ratio'].rolling(window=ma_period).mean() # Ratio MA
 
 strategy_returns = []
 benchmark_spy_returns = []
@@ -72,7 +83,7 @@ cumulative_values_benchmark_spy = [portfolio_value_benchmark_spy]
 cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc]
 
 trades_data = [] # List to store trade information
-current_allocation = "100% SPY / 0% BTC" # Initial allocation
+current_allocation = f"{int(max_spy_allocation * 100)}% SPY / 0% BTC" # Initial allocation based on max_spy
 annotations = [] # List to store annotations for the chart
 
 
@@ -81,30 +92,30 @@ for i in range(1, len(data)):
     yesterday = data.iloc[i-1]
 
     ratio_today = today['BTC_SPY_Ratio']
-    ma_20_yesterday_ratio = yesterday['Ratio_MA_20'] # Use yesterday's MA to make decision at market open
+    ma_yesterday_ratio = yesterday[f'Ratio_MA_{ma_period}'] # Use yesterday's MA to make decision at market open
     spy_close_today = today['SPY_Close_For_MA']
-    spy_ma_20_yesterday = yesterday['SPY_MA_20']
+    spy_ma_yesterday = yesterday[f'SPY_MA_{ma_period}']
 
     spy_return = today['SPY'] / yesterday['SPY'] - 1
     btc_return = today['BTC'] / yesterday['BTC'] - 1
 
-    # --- Independent Allocation Logic (Capped at 100%) ---
+    # --- Customizable Independent Allocation Logic (Capped at 100%) ---
     # SPY Allocation (Base)
-    if spy_close_today < spy_ma_20_yesterday:
-        base_spy_allocation = 0.5  # 50% SPY (Risk-Off)
+    if spy_close_today < spy_ma_yesterday:
+        base_spy_allocation = min_spy_allocation  # Min SPY Allocation (Risk-Off)
     else:
-        base_spy_allocation = 1.0  # 100% SPY (Risk-On)
+        base_spy_allocation = max_spy_allocation  # Max SPY Allocation (Risk-On)
 
     # BTC Allocation
-    if ratio_today > ma_20_yesterday_ratio:
-        btc_allocation = 0.2  # 20% BTC (Risk-On)
+    if ratio_today > ma_yesterday_ratio:
+        btc_allocation = max_btc_allocation  # Max BTC Allocation (Risk-On)
     else:
         btc_allocation = 0.0  # 0% BTC (Risk-Off)
 
     # Combine and Cap Total Allocation
-    if base_spy_allocation == 1.0 and btc_allocation == 0.2:
-        strategy_allocation_spy = 0.8  # 80% SPY
-        strategy_allocation_btc = 0.2  # 20% BTC
+    if base_spy_allocation == max_spy_allocation and btc_allocation == max_btc_allocation:
+        strategy_allocation_spy = max_spy_allocation * (1 - max_btc_allocation) # Reduce SPY to cap total at 100%
+        strategy_allocation_btc = max_btc_allocation
     else:
         strategy_allocation_spy = base_spy_allocation
         strategy_allocation_btc = btc_allocation
@@ -145,7 +156,7 @@ cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, in
 # --- Plotting ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
-                         mode='lines', name='Capped BTC/SPY MA Strategy'))
+                         mode='lines', name='Customizable BTC/SPY MA Strategy'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
                          mode='lines', name='100% SPY Benchmark'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
@@ -168,7 +179,7 @@ benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data
 
 
 performance_data = {
-    'Strategy': ['Capped BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
+    'Strategy': ['Customizable BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
     'CAGR': [
         calculate_cagr(cumulative_returns_strategy),
         calculate_cagr(cumulative_returns_benchmark_spy),
@@ -207,7 +218,7 @@ else:
 st.subheader("Final Portfolio Value")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Capped BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
+    st.metric("Customizable BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
 with col2:
     st.metric("100% SPY Benchmark", value=f"${portfolio_value_benchmark_spy:,.2f}")
 with col3:
