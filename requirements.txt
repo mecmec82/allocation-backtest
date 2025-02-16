@@ -1,7 +1,4 @@
-streamlit==1.29.0
-yfinance==0.2.36
-numpy==1.26.3
-pandas==2.2.0
-matplotlib==3.8.2
-hmmlearn==0.3.0 # Specify the hmmlearn version for stability
-scikit-learn==1.4.0 # scikit-learn is a dependency of hmmlearn
+streamlit
+pandas
+yahoo_fin
+plotly
