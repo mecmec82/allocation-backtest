@@ -1,6 +1,7 @@
-pandas
-numpy
-yahoo_fin
-scipy
-streamlit
-plotly
+# requirements.txt
+streamlit==1.29.0
+yfinance==0.2.36
+statsmodels==0.14.1
+numpy==1.26.3
+pandas==2.2.0
+matplotlib==3.8.2
