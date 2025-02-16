@@ -3,14 +3,42 @@ import pandas as pd
 import yahoo_fin.stock_info as si
 import plotly.graph_objects as go
 import numpy as np
+from datetime import date, timedelta
 
 st.title("Customizable BTC/SPY Allocation Strategy Backtest")
 st.write("Compares a customizable BTC/SPY allocation strategy against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
-start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
-end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
+
+date_option = st.sidebar.selectbox("Date Range Options", ["Specific Dates", "Relative to Today"])
+
+if date_option == "Specific Dates":
+    start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
+    end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
+else:
+    relative_period = st.sidebar.selectbox("Relative Period",
+                                          ["Last 30 Days", "Last 90 Days", "Year to Date", "Last Year", "Last 5 Years"])
+    today = date.today()
+    if relative_period == "Last 30 Days":
+        start_date = today - timedelta(days=30)
+        end_date = today
+    elif relative_period == "Last 90 Days":
+        start_date = today - timedelta(days=90)
+        end_date = today
+    elif relative_period == "Year to Date":
+        start_date = date(today.year, 1, 1)
+        end_date = today
+    elif relative_period == "Last Year":
+        start_date = date(today.year - 1, today.month, today.day)
+        end_date = today
+    elif relative_period == "Last 5 Years":
+        start_date = today - timedelta(days=5*365) # approx, leap years not considered
+        end_date = today
+    start_date = pd.to_datetime(start_date) # Convert to datetime for yahoo_fin
+    end_date = pd.to_datetime(end_date)     # Convert to datetime for yahoo_fin
+
+
 initial_investment = st.sidebar.number_input("Initial Investment", value=10000)
 
 st.sidebar.header("Strategy Parameters")
