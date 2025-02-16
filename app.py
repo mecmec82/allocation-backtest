@@ -32,13 +32,13 @@ def get_historical_data(ticker, start_date, end_date):
         return None
 
 # --- Indicator Calculation Functions ---
-def calculate_ma(df, periods):
-    df[f'MA_{periods}'] = df['Close'].rolling(window=periods).mean()
+def calculate_ma(df, periods, column_name='Close'): # added column_name parameter with default 'Close'
+    df[f'MA_{periods}'] = df[column_name].rolling(window=periods).mean() # use column_name
     return df
 
-def calculate_stoch_rsi(df, periods, k_periods, d_periods):
+def calculate_stoch_rsi(df, periods, k_periods, d_periods, column_name='Close'): # added column_name parameter with default 'Close'
     # RSI
-    delta = df['Close'].diff()
+    delta = df[column_name].diff() # use column_name
     gain = (delta.where(delta > 0, 0)).fillna(0)
     loss = (-delta.where(delta < 0, 0)).fillna(0)
     avg_gain = gain.rolling(window=periods, min_periods=periods).mean()
@@ -49,16 +49,16 @@ def calculate_stoch_rsi(df, periods, k_periods, d_periods):
     # Stochastic RSI
     rsi_min = rsi.rolling(window=periods, min_periods=periods).min()
     rsi_max = rsi.rolling(window=periods, min_periods=periods).max()
-    stoch_rsi = ((rsi - rsi_min) / (rsi_max - rsi_min)) * 100
+    stoch_rsi = ((rsi - rsi_min) / (rsi_max - rsi_max)) * 100
 
     df['Stoch_RSI'] = stoch_rsi
     df[f'Stoch_RSI_K_{k_periods}'] = df['Stoch_RSI'].rolling(window=k_periods).mean()
     df[f'Stoch_RSI_D_{d_periods}'] = df[f'Stoch_RSI_K_{k_periods}'].rolling(window=d_periods).mean()
     return df
 
-def calculate_macd(df, fast_period, slow_period, signal_period):
-    ema_fast = df['Close'].ewm(span=fast_period, adjust=False).mean()
-    ema_slow = df['Close'].ewm(span=slow_period, adjust=False).mean()
+def calculate_macd(df, fast_period, slow_period, signal_period, column_name='Close'): # added column_name parameter with default 'Close'
+    ema_fast = df[column_name].ewm(span=fast_period, adjust=False).mean() # use column_name
+    ema_slow = df[column_name].ewm(span=slow_period, adjust=False).mean() # use column_name
     macd_line = ema_fast - ema_slow
     signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
     df['MACD'] = macd_line
@@ -87,9 +87,9 @@ if selected_assets:
         # Calculate Relative Performance
         relative_df = pd.DataFrame(index=asset_data.index)
         relative_df['Relative_Ratio'] = asset_data['Close'] / spy_data['Close']
-        relative_df = calculate_ma(relative_df.copy(), ma_periods) # MA on Relative Ratio
-        relative_df = calculate_stoch_rsi(relative_df.copy(), stoch_rsi_periods, stoch_rsi_k, stoch_rsi_d) # Stoch RSI on Relative Ratio
-        relative_df = calculate_macd(relative_df.copy(), macd_fast_period, macd_slow_period, macd_signal_period) # MACD on Relative Ratio
+        relative_df = calculate_ma(relative_df.copy(), ma_periods, column_name='Relative_Ratio') # MA on Relative Ratio - specify column_name
+        relative_df = calculate_stoch_rsi(relative_df.copy(), stoch_rsi_periods, stoch_rsi_k, stoch_rsi_d, column_name='Relative_Ratio') # Stoch RSI on Relative Ratio - specify column_name
+        relative_df = calculate_macd(relative_df.copy(), macd_fast_period, macd_slow_period, macd_signal_period, column_name='Relative_Ratio') # MACD on Relative Ratio - specify column_name
 
 
         st.header(f"Analysis for {asset} vs SPY")
