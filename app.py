@@ -4,8 +4,8 @@ import yahoo_fin.stock_info as si
 import plotly.graph_objects as go
 import numpy as np
 
-st.title("BTC/SPY Independent Allocation Strategy Backtest")
-st.write("Compares a BTC/SPY independent allocation strategy against 100% SPY and 100% BTC benchmarks.")
+st.title("BTC/SPY Capped Allocation Strategy Backtest")
+st.write("Compares a BTC/SPY capped allocation strategy (max 100%) against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
@@ -88,18 +88,26 @@ for i in range(1, len(data)):
     spy_return = today['SPY'] / yesterday['SPY'] - 1
     btc_return = today['BTC'] / yesterday['BTC'] - 1
 
-    # --- Independent Allocation Logic ---
-    # SPY Allocation
+    # --- Independent Allocation Logic (Capped at 100%) ---
+    # SPY Allocation (Base)
     if spy_close_today < spy_ma_20_yesterday:
-        strategy_allocation_spy = 0.5  # 50% SPY
+        base_spy_allocation = 0.5  # 50% SPY (Risk-Off)
     else:
-        strategy_allocation_spy = 1.0  # 100% SPY
+        base_spy_allocation = 1.0  # 100% SPY (Risk-On)
 
     # BTC Allocation
     if ratio_today > ma_20_yesterday_ratio:
+        btc_allocation = 0.2  # 20% BTC (Risk-On)
+    else:
+        btc_allocation = 0.0  # 0% BTC (Risk-Off)
+
+    # Combine and Cap Total Allocation
+    if base_spy_allocation == 1.0 and btc_allocation == 0.2:
+        strategy_allocation_spy = 0.8  # 80% SPY
         strategy_allocation_btc = 0.2  # 20% BTC
     else:
-        strategy_allocation_btc = 0.0  # 0% BTC
+        strategy_allocation_spy = base_spy_allocation
+        strategy_allocation_btc = btc_allocation
 
     new_allocation = f"{int(strategy_allocation_spy * 100)}% SPY / {int(strategy_allocation_btc * 100)}% BTC"
 
@@ -137,7 +145,7 @@ cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, in
 # --- Plotting ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
-                         mode='lines', name='Independent BTC/SPY MA Strategy'))
+                         mode='lines', name='Capped BTC/SPY MA Strategy'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
                          mode='lines', name='100% SPY Benchmark'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
@@ -160,7 +168,7 @@ benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data
 
 
 performance_data = {
-    'Strategy': ['Independent BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
+    'Strategy': ['Capped BTC/SPY MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark'],
     'CAGR': [
         calculate_cagr(cumulative_returns_strategy),
         calculate_cagr(cumulative_returns_benchmark_spy),
@@ -199,7 +207,7 @@ else:
 st.subheader("Final Portfolio Value")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Independent BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
+    st.metric("Capped BTC/SPY MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
 with col2:
     st.metric("100% SPY Benchmark", value=f"${portfolio_value_benchmark_spy:,.2f}")
 with col3:
