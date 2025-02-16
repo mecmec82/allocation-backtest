@@ -71,7 +71,7 @@ if selected_assets:
     spy_data = get_historical_data("SPY", start_date, end_date)
     if spy_data is None:
         st.stop()
-    spy_data.rename(columns={'close': 'Close', 'adjclose': 'Adj Close'}, inplace=True) # standardize column names
+    spy_data.rename(columns={'close': 'Close', 'adjclose': 'Adj Close', 'open': 'Open', 'high': 'High', 'low': 'Low'}, inplace=True) # standardize column names
     spy_data = calculate_ma(spy_data.copy(), ma_periods) # Calculate MA for SPY as well for relative comparison
 
     for asset in selected_assets:
@@ -79,7 +79,7 @@ if selected_assets:
         if asset_data is None:
             continue # Skip to next asset if data fetch fails
 
-        asset_data.rename(columns={'close': 'Close', 'adjclose': 'Adj Close'}, inplace=True) # standardize column names
+        asset_data.rename(columns={'close': 'Close', 'adjclose': 'Adj Close', 'open': 'Open', 'high': 'High', 'low': 'Low'}, inplace=True) # standardize column names
         asset_data = calculate_ma(asset_data.copy(), ma_periods)
         asset_data = calculate_stoch_rsi(asset_data.copy(), stoch_rsi_periods, stoch_rsi_k, stoch_rsi_d)
         asset_data = calculate_macd(asset_data.copy(), macd_fast_period, macd_slow_period, macd_signal_period)
