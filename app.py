@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 st.title("BTC/SPY Allocation Strategy Backtest Comparison")
-st.write("Compares a BTC/SPY MA strategy against 100% SPY and 100% BTC benchmarks with trade visualization.")
+st.write("Compares a BTC/SPY MA strategy with 20% BTC cap and SPY MA risk reduction against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
@@ -49,7 +49,7 @@ btc_data = get_historical_data("BTC-USD", start_date, end_date)
 if spy_data is None or btc_data is None:
     st.stop()
 
-spy_data = spy_data[['adjclose']].rename(columns={'adjclose': 'SPY'})
+spy_data = spy_data[['adjclose', 'close']].rename(columns={'adjclose': 'SPY', 'close': 'SPY_Close_For_MA'}) # Keep close for MA calculation
 btc_data = btc_data[['adjclose']].rename(columns={'adjclose': 'BTC'})
 data = pd.concat([spy_data, btc_data], axis=1).dropna()
 
@@ -57,6 +57,7 @@ if data.empty:
     st.error("No overlapping data for SPY and BTC-USD within the selected date range.")
     st.stop()
 
+data['SPY_MA_20'] = data['SPY_Close_For_MA'].rolling(window=20).mean() # SPY 20-day MA
 data['BTC_SPY_Ratio'] = data['BTC'] / data['SPY']
 data['Ratio_MA_20'] = data['BTC_SPY_Ratio'].rolling(window=20).mean()
 
@@ -80,22 +81,39 @@ for i in range(1, len(data)):
     yesterday = data.iloc[i-1]
 
     ratio_today = today['BTC_SPY_Ratio']
-    ma_20_yesterday = yesterday['Ratio_MA_20'] # Use yesterday's MA to make decision at market open
+    ma_20_yesterday_ratio = yesterday['Ratio_MA_20'] # Use yesterday's MA to make decision at market open
+    spy_close_today = today['SPY_Close_For_MA']
+    spy_ma_20_yesterday = yesterday['SPY_MA_20']
 
     spy_return = today['SPY'] / yesterday['SPY'] - 1
     btc_return = today['BTC'] / yesterday['BTC'] - 1
 
-    # Strategy Allocation Logic
-    if ratio_today > ma_20_yesterday:
-        # 50% SPY, 50% BTC
-        strategy_allocation_spy = 0.5
-        strategy_allocation_btc = 0.5
-        new_allocation = "50/50 SPY/BTC"
-    else:
-        # 100% SPY
-        strategy_allocation_spy = 1.0
-        strategy_allocation_btc = 0.0
-        new_allocation = "100% SPY"
+    # --- Strategy Allocation Logic ---
+    spy_risk_off = spy_close_today < spy_ma_20_yesterday # Check if SPY is below its 20-day MA
+    btc_ratio_signal = ratio_today > ma_20_yesterday_ratio # Check BTC/SPY ratio signal
+
+    if spy_risk_off: # SPY Risk-Off Condition
+        if btc_ratio_signal:
+            # Reduced allocation, BTC capped at 20% of the *active* allocation (which is 50% of total)
+            strategy_allocation_spy = 0.5 * 0.8  # 40% SPY
+            strategy_allocation_btc = 0.5 * 0.2  # 10% BTC
+            new_allocation = "40% SPY / 10% BTC (Risk-Off)"
+        else:
+            # Reduced allocation, 100% to SPY within the active allocation (which is 50% of total)
+            strategy_allocation_spy = 0.5 * 1.0  # 50% SPY
+            strategy_allocation_btc = 0.0        # 0% BTC
+            new_allocation = "50% SPY (Risk-Off)"
+    else: # SPY Risk-On Condition
+        if btc_ratio_signal:
+            # BTC capped at 20%
+            strategy_allocation_spy = 0.8
+            strategy_allocation_btc = 0.2
+            new_allocation = "80% SPY / 20% BTC"
+        else:
+            # 100% SPY
+            strategy_allocation_spy = 1.0
+            strategy_allocation_btc = 0.0
+            new_allocation = "100% SPY"
 
     if new_allocation != current_allocation: # Allocation switch detected
         trades_data.append({
@@ -130,7 +148,7 @@ cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, in
 # --- Plotting ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
-                         mode='lines', name='BTC/SPY MA Strategy'))
+                         mode='lines', name='BTC/SPY MA Strategy (20% BTC Cap, SPY MA Risk-Off)'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
                          mode='lines', name='100% SPY Benchmark'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
