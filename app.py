@@ -5,23 +5,25 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import date, timedelta
 
-st.title("Customizable BTC/SPY Allocation Strategy Backtest")
 st.write("Compares a customizable BTC/SPY allocation strategy against 100% SPY and 100% BTC benchmarks.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
 
-date_option = st.sidebar.selectbox("Date Range Options", ["Specific Dates", "Relative to Today"])
+date_option = st.sidebar.selectbox("Date Range Options", [ "Relative to Today","Specific Dates"])
 
 if date_option == "Specific Dates":
     start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
     end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 else:
     relative_period = st.sidebar.selectbox("Relative Period",
-                                          ["Last 30 Days", "Last 90 Days", "Year to Date", "Last Year", "Last 5 Years"])
+                                          ["Last 30 Days","Last 60 Days", "Last 90 Days", "Year to Date", "Last Year", "Last 5 Years"])
     today = date.today()
     if relative_period == "Last 30 Days":
         start_date = today - timedelta(days=30)
+        end_date = today
+    elif relative_period == "Last 60 Days":
+        start_date = today - timedelta(days=60)
         end_date = today
     elif relative_period == "Last 90 Days":
         start_date = today - timedelta(days=90)
@@ -42,7 +44,7 @@ else:
 initial_investment = st.sidebar.number_input("Initial Investment", value=10000)
 
 st.sidebar.header("Strategy Parameters")
-ma_period = st.sidebar.number_input("Moving Average Period", min_value=5, max_value=200, value=20, step=5)
+ma_period = st.sidebar.number_input("Moving Average Period", min_value=5, max_value=200, value=10, step=5)
 min_spy_allocation_percent = st.sidebar.slider("Min SPY Allocation (%)", min_value=0, max_value=100, value=50, step=10)
 max_spy_allocation_percent = st.sidebar.slider("Max SPY Allocation (%)", min_value=0, max_value=100, value=100, step=10)
 max_btc_allocation_percent = st.sidebar.slider("Max BTC Allocation (%)", min_value=0, max_value=100, value=20, step=5)
