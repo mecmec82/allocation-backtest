@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 st.title("BTC/SPY Allocation Strategy Backtest Comparison")
-st.write("Compares a BTC/SPY MA strategy against 100% SPY and 100% BTC benchmarks.")
+st.write("Compares a BTC/SPY MA strategy against 100% SPY and 100% BTC benchmarks with trade visualization.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
@@ -70,6 +70,10 @@ cumulative_values_strategy = [portfolio_value_strategy]
 cumulative_values_benchmark_spy = [portfolio_value_benchmark_spy]
 cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc]
 
+trades_data = [] # List to store trade information
+current_allocation = "100% SPY" # Initial allocation
+annotations = [] # List to store annotations for the chart
+
 
 for i in range(1, len(data)):
     today = data.iloc[i]
@@ -86,10 +90,22 @@ for i in range(1, len(data)):
         # 50% SPY, 50% BTC
         strategy_allocation_spy = 0.5
         strategy_allocation_btc = 0.5
+        new_allocation = "50/50 SPY/BTC"
     else:
         # 100% SPY
         strategy_allocation_spy = 1.0
         strategy_allocation_btc = 0.0
+        new_allocation = "100% SPY"
+
+    if new_allocation != current_allocation: # Allocation switch detected
+        trades_data.append({
+            'Date': today.name.strftime('%Y-%m-%d'),
+            'From Allocation': current_allocation,
+            'To Allocation': new_allocation
+        })
+        annotations.append(dict(x=today.name, y=cumulative_values_strategy[-1], xref="x", yref="y",
+                            text=f"Switch to<br>{new_allocation}", showarrow=True, arrowhead=1, arrowcolor="blue", bgcolor="white"))
+        current_allocation = new_allocation # Update current allocation
 
     strategy_daily_return = (strategy_allocation_spy * spy_return) + (strategy_allocation_btc * btc_return)
     strategy_returns.append(strategy_daily_return)
@@ -120,11 +136,11 @@ fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
                          mode='lines', name='100% BTC Benchmark'))
 
-
-fig.update_layout(title='Cumulative Returns: Strategy vs Benchmarks',
+fig.update_layout(title='Cumulative Returns: Strategy vs Benchmarks with Allocation Switches',
                   xaxis_title='Date',
                   yaxis_title='Portfolio Value ($)',
-                  xaxis_rangeslider_visible=False)
+                  xaxis_rangeslider_visible=False,
+                  annotations=annotations) # Add annotations to the layout
 
 st.plotly_chart(fig, use_container_width=True)
 
@@ -162,6 +178,14 @@ st.dataframe(performance_df.style.format({ # Format as percentages and rounded S
     'Max Drawdown': '{:.2%}',
     'Sharpe Ratio': '{:.2f}'
 }))
+
+# --- Trade Table ---
+st.subheader("Allocation Switches (Trades)")
+if trades_data:
+    trades_df = pd.DataFrame(trades_data)
+    st.dataframe(trades_df)
+else:
+    st.info("No allocation switches occurred within the selected date range.")
 
 
 # --- Final Portfolio Value Summary ---
