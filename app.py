@@ -1,130 +1,109 @@
 import streamlit as st
 import pandas as pd
+import yfinance as yf
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from utils import fetch_data, calculate_returns, calculate_portfolio_returns, calculate_performance_metrics, calculate_correlation_matrix, identify_risk_regime
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+from statsmodels.tsa.statespace.markov_switching import MarkovRegression
 
-st.title("Investment Portfolio Dashboard")
+st.title("SPY Index with Markov Switching Model")
 
-# 1. User Inputs
-st.header("Portfolio Configuration")
-start_date = st.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
-end_date = st.date_input("End Date", value=pd.to_datetime("today"))
+# Sidebar controls
+st.sidebar.header("Model Parameters")
+k_states = st.sidebar.slider("Number of States", min_value=2, max_value=4, value=2, step=1, help="Number of hidden states in the Markov Switching model. 2 is generally uptrend/downtrend.")
+switching_variance = st.sidebar.checkbox("Switching Variance", value=True, help="Allow variance to switch between states.")
+use_log_returns = st.sidebar.checkbox("Use Log Returns", value=True, help="Analyze log returns instead of price levels. This is generally recommended for financial time series.")
+# Date Range
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 
-# ETF Selection
-available_etfs = ["SPY", "TLT", "GLD", "XLU", "XLP"]  # Add more as needed
-selected_etfs = st.multiselect("Select ETFs", available_etfs, default=["SPY", "TLT"])
+# Data Acquisition
+@st.cache_data
+def load_data(ticker, start, end):
+    data = yf.download(ticker, start=start, end=end)
+    return data
 
-# Regime Detection Parameters
-st.sidebar.header("Regime Detection")
-short_ma_length = st.sidebar.slider("Short Moving Average Length", 5, 50, 20)
-long_ma_length = st.sidebar.slider("Long Moving Average Length", 50, 200, 100)
-vix_threshold = st.sidebar.slider("VIX Threshold", 10.0, 50.0, 25.0)
-
-# Risk-Off Allocation
-st.sidebar.header("Risk-Off Allocation")
-risk_off_allocation = {}
-for etf in selected_etfs:
-    risk_off_allocation[etf] = st.sidebar.slider(f"Risk-Off {etf} (%)", 0.0, 100.0, 0.0 if etf == "SPY" else 50.0 if etf == "TLT" else 0.0) / 100.0
-# Normalize Risk-Off Allocations
-total_risk_off_allocation = sum(risk_off_allocation.values())
-for etf in risk_off_allocation:
-    risk_off_allocation[etf] /= total_risk_off_allocation
-
-# 2. Data Fetching and Calculation
 try:
-    spy_data = fetch_data(['SPY'], start_date, end_date)['SPY'] #Spy data for regime identification
-    vix_data = fetch_data(['^VIX'], start_date, end_date)['^VIX']
-    all_etf_data = fetch_data(selected_etfs, start_date, end_date)
-    etf_returns = calculate_returns(all_etf_data)
+    data = load_data("SPY", start_date, end_date)
+    if data.empty:
+        st.error("No data found for the specified date range. Please adjust the start and end dates.")
+        st.stop() # stop execution if no data
 
-    # Identify Risk Regimes
-    spy_data_with_regime = identify_risk_regime(spy_data.copy(), short_ma_length, long_ma_length, vix_data, vix_threshold)
+    st.subheader("SPY Data")
+    st.dataframe(data.head())
+
+    # Prepare Data for Model
+    if use_log_returns:
+        returns = np.log(data['Adj Close']).diff().dropna()
+    else:
+        returns = data['Adj Close'].dropna() # Just use price if not log returns
+    model = MarkovRegression(returns, k_regimes=k_states, switching_variance=switching_variance)
+    try:
+        results = model.fit()
+    except Exception as e:
+        st.error(f"Model fitting failed: {e}.  Try a different date range or different model parameters.")
+        st.stop()
+
+    st.subheader("Model Summary")
+    st.write(results.summary())
+
+
+
+    # Plotting
+    st.subheader("SPY Price with Regime Highlighting")
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Plot Price Data
+    ax.plot(data.index, data['Adj Close'], label='SPY Price', color='blue')
+
+    # Get Regime Probabilities
+    regime_probs = results.smoothed_marginal_probabilities
+    regime_probs.index = data.index[1:] if use_log_returns else data.index #adjust index if using returns
+
+    # Find Regime Changes and Highlight Regions
+    regime_changes = regime_probs.idxmax(axis=1) #finds date of highest probability regime
+
+    current_regime = regime_changes.iloc[0]
+    start_date_regime = regime_changes.index[0]
+    for i in range(1, len(regime_changes)):
+        if regime_changes.iloc[i] != current_regime:
+            end_date_regime = regime_changes.index[i]
+            if current_regime == regime_probs.columns[0]: #assuming first regime is downtrend
+                ax.axvspan(start_date_regime, end_date_regime, color='red', alpha=0.2, label='Downtrend' if i==1 else None) #only label first time to avoid dups
+            else:
+                ax.axvspan(start_date_regime, end_date_regime, color='green', alpha=0.2, label='Uptrend' if i==1 else None)
+            current_regime = regime_changes.iloc[i]
+            start_date_regime = end_date_regime #continue from the regime change
+    #handle the last region
+    end_date_regime = regime_changes.index[-1]
+    if current_regime == regime_probs.columns[0]:  # assuming first regime is downtrend
+        ax.axvspan(start_date_regime, end_date_regime, color='red', alpha=0.2,
+                   label='Downtrend' if i == 1 else None)  # only label first time to avoid dups
+    else:
+        ax.axvspan(start_date_regime, end_date_regime, color='green', alpha=0.2,
+                   label='Uptrend' if i == 1 else None)
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("SPY Price")
+    ax.set_title("SPY Price with Markov Switching Regimes")
+    ax.legend()
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+    #Regime Prob Plot
+    st.subheader("Regime Probabilities")
+    fig_regime, ax_regime = plt.subplots(figsize=(12, 6))
+    for col in regime_probs.columns:
+        ax_regime.plot(regime_probs.index, regime_probs[col], label=col)
+    ax_regime.set_xlabel("Date")
+    ax_regime.set_ylabel("Probability")
+    ax_regime.set_title("Regime Probabilities Over Time")
+    ax_regime.legend()
+    ax_regime.grid(True)
+    st.pyplot(fig_regime)
+
+
 
 except Exception as e:
     st.error(f"An error occurred: {e}")
-    st.stop()  # Stop execution if there's an error
-
-# 3. SPY Chart with Regime Highlighting
-st.header("SPY Price with Risk Regimes")
-fig_spy = go.Figure()
-fig_spy.add_trace(go.Scatter(x=spy_data_with_regime.index, y=spy_data_with_regime['adjclose'], name='SPY Price'))
-
-# Add shaded regions for risk-on/risk-off
-risk_on_indices = spy_data_with_regime[spy_data_with_regime['Regime'] == 1].index
-risk_off_indices = spy_data_with_regime[spy_data_with_regime['Regime'] == -1].index
-
-for i in range(len(risk_on_indices)):
-  if i == 0 or risk_on_indices[i] != risk_on_indices[i-1] + pd.Timedelta(days=1):
-    start_date_risk_on = risk_on_indices[i]
-  if i == len(risk_on_indices) -1 or risk_on_indices[i] != risk_on_indices[i+1] - pd.Timedelta(days=1):
-    end_date_risk_on = risk_on_indices[i]
-    fig_spy.add_vrect(x0=start_date_risk_on, x1=end_date_risk_on, fillcolor="green", opacity=0.2, layer="below", line_width=0) # Risk-On
-
-
-for i in range(len(risk_off_indices)):
-  if i == 0 or risk_off_indices[i] != risk_off_indices[i-1] + pd.Timedelta(days=1):
-    start_date_risk_off = risk_off_indices[i]
-  if i == len(risk_off_indices) -1 or risk_off_indices[i] != risk_off_indices[i+1] - pd.Timedelta(days=1):
-    end_date_risk_off = risk_off_indices[i]
-    fig_spy.add_vrect(x0=start_date_risk_off, x1=end_date_risk_off, fillcolor="red", opacity=0.2, layer="below", line_width=0) # Risk-Off
-
-
-st.plotly_chart(fig_spy)
-
-# 4. Backtesting and Returns Chart
-
-#Initial Allocation to 100% SPY for backtesting
-spy_only_allocation = {'SPY': 1.0}
-for etf in selected_etfs:
-  if etf != 'SPY':
-    spy_only_allocation[etf] = 0.0
-
-spy_only_returns = calculate_portfolio_returns(etf_returns, spy_only_allocation)
-
-portfolio_returns = [] # Backtesting
-spy_returns = [] # for comparison
-cumulative_portfolio_value = 100.0
-cumulative_spy_value = 100.0
-portfolio_values = [cumulative_portfolio_value]
-spy_values = [cumulative_spy_value]
-
-#Backtesting
-for i, date in enumerate(etf_returns.index):
-  regime = spy_data_with_regime.loc[date, 'Regime']
-  if regime == 1: #Risk-On - allocate to Spy
-    daily_return = calculate_portfolio_returns(etf_returns.iloc[[i]], spy_only_allocation).values[0]
-    cumulative_portfolio_value *= (1 + daily_return)
-  elif regime == -1: # Risk-Off - Allocate to user-defined allocation
-    daily_return = calculate_portfolio_returns(etf_returns.iloc[[i]], risk_off_allocation).values[0]
-    cumulative_portfolio_value *= (1+daily_return)
-  else: #Neutral
-    daily_return = calculate_portfolio_returns(etf_returns.iloc[[i]], spy_only_allocation).values[0]
-    cumulative_portfolio_value *= (1+daily_return)
-  
-  cumulative_spy_value *= (1 + spy_only_returns.iloc[i]) #Track SPY
-
-  portfolio_values.append(cumulative_portfolio_value)
-  spy_values.append(cumulative_spy_value)
-
-portfolio_values = pd.Series(portfolio_values[:-1], index = etf_returns.index)
-spy_values = pd.Series(spy_values[:-1], index = etf_returns.index)
-
-st.header("Portfolio vs. SPY Returns")
-fig_returns = go.Figure()
-fig_returns.add_trace(go.Scatter(x=portfolio_values.index, y=portfolio_values, name='Portfolio Returns'))
-fig_returns.add_trace(go.Scatter(x=spy_values.index, y=spy_values, name='SPY Returns'))
-
-st.plotly_chart(fig_returns)
-
-# 5. Performance Metrics
-st.header("Performance Metrics")
-
-st.subheader("Portfolio Performance")
-portfolio_perf = calculate_performance_metrics(calculate_returns(portfolio_values)) #Calculate performance of portfolio
-st.write(portfolio_perf)
-
-st.subheader("SPY Performance")
-spy_perf = calculate_performance_metrics(calculate_returns(spy_values))
-st.write(spy_perf)
