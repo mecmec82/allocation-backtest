@@ -84,7 +84,7 @@ def calculate_max_drawdown(cumulative_returns):
     max_drawdown = drawdown.min()
     return max_drawdown
 
-def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk_free_rate = 0
+def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk-free rate = 0
     excess_returns = returns - risk_free_rate / periods_per_year
     sharpe_ratio = np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
     return sharpe_ratio
@@ -121,9 +121,9 @@ portfolio_value_benchmark_spy = initial_investment
 portfolio_value_benchmark_btc = initial_investment
 portfolio_value_benchmark_inverse_etf = initial_investment # Inverse_ETF benchmark # use generic name
 cumulative_values_strategy = [portfolio_value_strategy]
-cumulative_values_benchmark_spy = [cumulative_values_benchmark_spy]
-cumulative_values_benchmark_btc = [cumulative_values_benchmark_btc]
-cumulative_values_benchmark_inverse_etf = [cumulative_values_benchmark_inverse_etf] # Inverse_ETF benchmark # use generic name
+cumulative_values_benchmark_spy = [portfolio_value_benchmark_spy] # removed extra brackets
+cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc] # removed extra brackets
+cumulative_values_benchmark_inverse_etf = [portfolio_value_benchmark_inverse_etf] # removed extra brackets # Inverse_ETF benchmark # use generic name
 
 
 trades_data = [] # List to store trade information
