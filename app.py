@@ -109,10 +109,10 @@ data[f'Ratio_MA_{ma_period}_BTC'] = data['BTC_SPY_Ratio'].rolling(window=ma_peri
 data['GLD_SPY_Ratio'] = data['GLD'] / data['SPY']
 data[f'Ratio_MA_{ma_period}_GLD'] = data['GLD_SPY_Ratio'].rolling(window=ma_period).mean() # Ratio MA for GLD
 
-strategy_returns = []
-benchmark_spy_returns = []
-benchmark_btc_returns = []
-benchmark_gld_returns = []
+strategy_returns = [0.0] # Initialize with 0.0
+benchmark_spy_returns = [0.0] # Initialize with 0.0
+benchmark_btc_returns = [0.0] # Initialize with 0.0
+benchmark_gld_returns = [0.0] # Initialize with 0.0
 portfolio_value_strategy = initial_investment
 portfolio_value_benchmark_spy = initial_investment
 portfolio_value_benchmark_btc = initial_investment
@@ -193,19 +193,16 @@ for i in range(1, len(data)):
 
     # Benchmark (100% SPY)
     benchmark_spy_returns.append(spy_return)
-    benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_spy *= (1 + spy_return)
     cumulative_values_benchmark_spy.append(portfolio_value_benchmark_spy)
 
     # Benchmark (100% BTC)
     benchmark_btc_returns.append(btc_return)
-    benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_btc *= (1 + btc_return)
     cumulative_values_benchmark_btc.append(portfolio_value_benchmark_btc)
 
     # Benchmark (100% GLD)
     benchmark_gld_returns.append(gld_return)
-    benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_gld *= (1 + gld_return)
     cumulative_values_benchmark_gld.append(portfolio_value_benchmark_gld)
 
@@ -242,7 +239,10 @@ st.plotly_chart(fig, use_container_width=True)
 # --- Performance Summary Table ---
 st.subheader("Performance Metrics")
 
-strategy_daily_returns_series = pd.Series(strategy_returns, index=data.index[1:]) # Daily returns series for Sharpe Ratio
+strategy_daily_returns_series = pd.Series(strategy_returns[1:], index=data.index[1:]) # Daily returns series for Sharpe Ratio - sliced from index 1 to align
+benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns[1:], index=data.index[1:]) # sliced from index 1
+benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns[1:], index=data.index[1:]) # sliced from index 1
+benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns[1:], index=data.index[1:]) # sliced from index 1
 
 
 performance_data = {
