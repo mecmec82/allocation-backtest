@@ -5,8 +5,8 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import date, timedelta
 
-st.title("Customizable SPY/BTC/GLD Allocation Strategy Backtest")
-st.write("Compares a customizable SPY/BTC/GLD allocation strategy against 100% SPY, 100% BTC and 100% GLD benchmarks with transaction fees and hover labels.")
+st.title("Customizable SPY/BTC/XSPS Allocation Strategy Backtest")
+st.write("Compares a customizable SPY/BTC/XSPS allocation strategy against 100% SPY, 100% BTC and 100% XSPS benchmarks with transaction fees and hover labels.")
 
 # --- User Inputs ---
 st.sidebar.header("Backtest Settings")
@@ -47,13 +47,13 @@ initial_investment = st.sidebar.number_input("Initial Investment", value=10000)
 st.sidebar.header("Strategy Parameters")
 ma_period = st.sidebar.number_input("Moving Average Period", min_value=5, max_value=200, value=20, step=5)
 max_btc_allocation_percent = st.sidebar.slider("Max BTC Allocation (%)", min_value=0, max_value=40, value=20, step=5)
-max_gld_allocation_percent = st.sidebar.slider("Max GLD Allocation (%)", min_value=0, max_value=40, value=20, step=5)
+max_xsps_allocation_percent = st.sidebar.slider("Max XSPS Allocation (%)", min_value=0, max_value=40, value=20, step=5)
 transaction_fee_percent = st.sidebar.number_input("Transaction Fee (%) per Switch", min_value=0.0, max_value=5.0, value=0.5, step=0.1) / 100.0
 
 spy_allocation_percent = 60.0 # Fixed SPY allocation
 spy_allocation = spy_allocation_percent / 100.0
 max_btc_allocation = max_btc_allocation_percent / 100.0
-max_gld_allocation = max_gld_allocation_percent / 100.0
+max_xsps_allocation = max_xsps_allocation_percent / 100.0
 transaction_fee = transaction_fee_percent # already in decimal form
 
 
@@ -81,7 +81,7 @@ def calculate_max_drawdown(cumulative_returns):
     max_drawdown = drawdown.min()
     return max_drawdown
 
-def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk-free rate = 0
+def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk_free_rate = 0
     excess_returns = returns - risk_free_rate / periods_per_year
     sharpe_ratio = np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
     return sharpe_ratio
@@ -89,42 +89,42 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): #
 # --- Strategy Logic and Backtesting ---
 spy_data = get_historical_data("SPY", start_date, end_date)
 btc_data = get_historical_data("BTC-USD", start_date, end_date)
-gld_data = get_historical_data("GLD", start_date, end_date)
+xsps_data = get_historical_data("XSPS", start_date, end_date) # get XSPS data
 
-if spy_data is None or btc_data is None or gld_data is None:
+if spy_data is None or btc_data is None or xsps_data is None: # check for XSPS data
     st.stop()
 
 spy_data = spy_data[['adjclose', 'close']].rename(columns={'adjclose': 'SPY', 'close': 'SPY_Close_For_MA'}) # Keep close for MA calculation
 btc_data = btc_data[['adjclose']].rename(columns={'adjclose': 'BTC'})
-gld_data = gld_data[['adjclose']].rename(columns={'adjclose': 'GLD'})
-data = pd.concat([spy_data, btc_data, gld_data], axis=1).dropna()
+xsps_data = xsps_data[['adjclose']].rename(columns={'adjclose': 'XSPS'}) # rename XSPS data
+data = pd.concat([spy_data, btc_data, xsps_data], axis=1).dropna() # concat XSPS data
 
 if data.empty:
-    st.error("No overlapping data for SPY, BTC-USD and GLD within the selected date range.")
+    st.error("No overlapping data for SPY, BTC-USD and XSPS within the selected date range.") # updated error message
     st.stop()
 
 data[f'SPY_MA_{ma_period}'] = data['SPY_Close_For_MA'].rolling(window=ma_period).mean() # SPY MA
 data['BTC_SPY_Ratio'] = data['BTC'] / data['SPY']
 data[f'Ratio_MA_{ma_period}_BTC'] = data['BTC_SPY_Ratio'].rolling(window=ma_period).mean() # Ratio MA for BTC
-data['GLD_SPY_Ratio'] = data['GLD'] / data['SPY']
-data[f'Ratio_MA_{ma_period}_GLD'] = data['GLD_SPY_Ratio'].rolling(window=ma_period).mean() # Ratio MA for GLD
+data['XSPS_SPY_Ratio'] = data['XSPS'] / data['SPY'] # XSPS/SPY Ratio
+data[f'Ratio_MA_{ma_period}_XSPS'] = data['XSPS_SPY_Ratio'].rolling(window=ma_period).mean() # Ratio MA for XSPS
 
 strategy_returns = [0.0] # Initialize with 0.0
 benchmark_spy_returns = [0.0] # Initialize with 0.0
 benchmark_btc_returns = [0.0] # Initialize with 0.0
-benchmark_gld_returns = [0.0] # Initialize with 0.0
+benchmark_xsps_returns = [0.0] # Initialize with 0.0 # XSPS benchmark
 portfolio_value_strategy = initial_investment
 portfolio_value_benchmark_spy = initial_investment
 portfolio_value_benchmark_btc = initial_investment
-portfolio_value_benchmark_gld = initial_investment
+portfolio_value_benchmark_xsps = initial_investment # XSPS benchmark
 cumulative_values_strategy = [portfolio_value_strategy]
 cumulative_values_benchmark_spy = [portfolio_value_benchmark_spy]
 cumulative_values_benchmark_btc = [portfolio_value_benchmark_btc]
-cumulative_values_benchmark_gld = [portfolio_value_benchmark_gld]
+cumulative_values_benchmark_xsps = [portfolio_value_benchmark_xsps] # XSPS benchmark
 
 
 trades_data = [] # List to store trade information
-current_allocation = f"{int(spy_allocation * 100)}% SPY / 0% BTC / 0% GLD" # Initial allocation
+current_allocation = f"{int(spy_allocation * 100)}% SPY / 0% BTC / 0% XSPS" # Initial allocation # XSPS
 final_allocation = current_allocation # Initialize final allocation
 annotations = [] # List to store annotations for the chart
 
@@ -135,41 +135,41 @@ for i in range(1, len(data)):
 
     ratio_today_btc = today['BTC_SPY_Ratio']
     ma_yesterday_ratio_btc = yesterday[f'Ratio_MA_{ma_period}_BTC'] # Use yesterday's MA to make decision at market open
-    ratio_today_gld = today['GLD_SPY_Ratio']
-    ma_yesterday_ratio_gld = yesterday[f'Ratio_MA_{ma_period}_GLD'] # Use yesterday's MA to make decision at market open
+    ratio_today_xsps = today['XSPS_SPY_Ratio'] # XSPS Ratio
+    ma_yesterday_ratio_xsps = yesterday[f'Ratio_MA_{ma_period}_XSPS'] # Use yesterday's MA to make decision at market open # XSPS Ratio MA
 
 
     spy_return = today['SPY'] / yesterday['SPY'] - 1
     btc_return = today['BTC'] / yesterday['BTC'] - 1
-    gld_return = today['GLD'] / yesterday['GLD'] - 1
+    xsps_return = today['XSPS'] / yesterday['XSPS'] - 1 # XSPS return
 
     # --- Customizable Independent Allocation Logic (Capped at 100%) ---
     btc_allocation = 0.0
-    gld_allocation = 0.0
+    xsps_allocation = 0.0 # XSPS allocation
 
     btc_signal = ratio_today_btc > ma_yesterday_ratio_btc
-    gld_signal = ratio_today_gld > ma_yesterday_ratio_gld
+    xsps_signal = ratio_today_xsps > ma_yesterday_ratio_xsps # XSPS signal
 
-    if btc_signal and not gld_signal:
+    if btc_signal and not xsps_signal:
         btc_allocation = max_btc_allocation
-        gld_allocation = 0.0
-    elif not btc_signal and gld_signal:
+        xsps_allocation = 0.0
+    elif not btc_signal and xsps_signal:
         btc_allocation = 0.0
-        gld_allocation = max_gld_allocation
-    elif btc_signal and gld_signal:
+        xsps_allocation = max_xsps_allocation
+    elif btc_signal and xsps_signal:
         btc_allocation = max_btc_allocation / 2.0
-        gld_allocation = max_gld_allocation / 2.0
+        xsps_allocation = max_xsps_allocation / 2.0
     else: # neither signal
         btc_allocation = 0.0
-        gld_allocation = 0.0
+        xsps_allocation = 0.0
 
 
     strategy_allocation_spy = spy_allocation # Fixed SPY Allocation
 
 
     new_allocation_btc = int(btc_allocation * 100)
-    new_allocation_gld = int(gld_allocation * 100)
-    new_allocation = f"{int(strategy_allocation_spy * 100)}% SPY / {new_allocation_btc}% BTC / {new_allocation_gld}% GLD"
+    new_allocation_xsps = int(xsps_allocation * 100) # XSPS allocation
+    new_allocation = f"{int(strategy_allocation_spy * 100)}% SPY / {new_allocation_btc}% BTC / {new_allocation_xsps}% XSPS" # XSPS allocation in string
 
 
     if new_allocation != current_allocation: # Allocation switch detected
@@ -186,7 +186,7 @@ for i in range(1, len(data)):
         current_allocation = new_allocation # Update current allocation
     final_allocation = new_allocation # Update final allocation at each step, so last value after loop is final
 
-    strategy_daily_return = (strategy_allocation_spy * spy_return) + (btc_allocation * btc_return) + (gld_allocation * gld_return)
+    strategy_daily_return = (strategy_allocation_spy * spy_return) + (btc_allocation * btc_return) + (xsps_allocation * xsps_return) # XSPS return
     strategy_returns.append(strategy_daily_return)
     portfolio_value_strategy *= (1 + strategy_daily_return)
     cumulative_values_strategy.append(portfolio_value_strategy)
@@ -201,16 +201,16 @@ for i in range(1, len(data)):
     portfolio_value_benchmark_btc *= (1 + btc_return)
     cumulative_values_benchmark_btc.append(portfolio_value_benchmark_btc)
 
-    # Benchmark (100% GLD)
-    benchmark_gld_returns.append(gld_return)
-    portfolio_value_benchmark_gld *= (1 + gld_return)
-    cumulative_values_benchmark_gld.append(portfolio_value_benchmark_gld)
+    # Benchmark (100% XSPS) # XSPS Benchmark
+    benchmark_xsps_returns.append(xsps_return) # XSPS return
+    portfolio_value_benchmark_xsps *= (1 + xsps_return) # XSPS portfolio value
+    cumulative_values_benchmark_xsps.append(portfolio_value_benchmark_xsps) # XSPS cumulative values
 
 
 cumulative_returns_strategy = pd.Series(cumulative_values_strategy, index=data.index)
 cumulative_returns_benchmark_spy = pd.Series(cumulative_values_benchmark_spy, index=data.index)
 cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, index=data.index)
-cumulative_returns_benchmark_gld = pd.Series(cumulative_values_benchmark_gld, index=data.index)
+cumulative_returns_benchmark_xsps = pd.Series(cumulative_values_benchmark_xsps, index=data.index) # XSPS cumulative returns
 
 
 # --- Display Current Allocation Banner ---
@@ -219,13 +219,13 @@ st.markdown(f"<h2 style='text-align: center; color: blue;'>Current Allocation: {
 # --- Plotting ---
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
-                         mode='lines', name='Customizable SPY/BTC/GLD MA Strategy'))
+                         mode='lines', name='Customizable SPY/BTC/XSPS MA Strategy')) # XSPS in name
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
                          mode='lines', name='100% SPY Benchmark'))
 fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
                          mode='lines', name='100% BTC Benchmark'))
-fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_gld.index, y=cumulative_returns_benchmark_gld,
-                         mode='lines', name='100% GLD Benchmark'))
+fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_xsps.index, y=cumulative_returns_benchmark_xsps, # XSPS benchmark trace
+                         mode='lines', name='100% XSPS Benchmark')) # XSPS benchmark name
 
 
 fig.update_layout(title='Cumulative Returns: Strategy vs Benchmarks with Allocation Switches',
@@ -242,28 +242,28 @@ st.subheader("Performance Metrics")
 strategy_daily_returns_series = pd.Series(strategy_returns[1:], index=data.index[1:]) # Daily returns series for Sharpe Ratio - sliced from index 1 to align
 benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns[1:], index=data.index[1:]) # sliced from index 1
 benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns[1:], index=data.index[1:]) # sliced from index 1
-benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns[1:], index=data.index[1:]) # sliced from index 1
+benchmark_xsps_daily_returns_series = pd.Series(benchmark_xsps_returns[1:], index=data.index[1:]) # sliced from index 1 # XSPS daily returns
 
 
 performance_data = {
-    'Strategy': ['Customizable SPY/BTC/GLD MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark', '100% GLD Benchmark'],
+    'Strategy': ['Customizable SPY/BTC/XSPS MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark', '100% XSPS Benchmark'], # XSPS in strategy name
     'CAGR': [
         calculate_cagr(cumulative_returns_strategy),
         calculate_cagr(cumulative_returns_benchmark_spy),
         calculate_cagr(cumulative_returns_benchmark_btc),
-        calculate_cagr(cumulative_returns_benchmark_gld)
+        calculate_cagr(cumulative_returns_benchmark_xsps) # XSPS CAGR
     ],
     'Max Drawdown': [
         calculate_max_drawdown(cumulative_returns_strategy),
         calculate_max_drawdown(cumulative_returns_benchmark_spy),
         calculate_max_drawdown(cumulative_returns_benchmark_btc),
-        calculate_max_drawdown(cumulative_returns_benchmark_gld)
+        calculate_max_drawdown(cumulative_returns_benchmark_xsps) # XSPS Max Drawdown
     ],
     'Sharpe Ratio': [
         calculate_sharpe_ratio(strategy_daily_returns_series),
         calculate_sharpe_ratio(benchmark_spy_daily_returns_series),
         calculate_sharpe_ratio(benchmark_btc_daily_returns_series),
-        calculate_sharpe_ratio(benchmark_gld_daily_returns_series)
+        calculate_sharpe_ratio(benchmark_xsps_daily_returns_series) # XSPS Sharpe Ratio
     ]
 }
 
@@ -288,18 +288,18 @@ else:
 st.subheader("Final Portfolio Value")
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Customizable SPY/BTC/GLD MA Strategy", value=f"${portfolio_value_strategy:,.2f}")
+    st.metric("Customizable SPY/BTC/XSPS MA Strategy", value=f"${portfolio_value_strategy:,.2f}") # XSPS in metric
 with col2:
     st.metric("100% SPY Benchmark", value=f"${portfolio_value_benchmark_spy:,.2f}")
 with col3:
     st.metric("100% BTC Benchmark", value=f"${portfolio_value_benchmark_btc:,.2f}")
 with col4:
-    st.metric("100% GLD Benchmark", value=f"${portfolio_value_benchmark_gld:,.2f}")
+    st.metric("100% XSPS Benchmark", value=f"${portfolio_value_benchmark_xsps:,.2f}") # XSPS benchmark metric
 
 
 st.sidebar.markdown("""
 ---
 **Disclaimer:** This is for educational purposes only and not financial advice.
 Investment decisions should be based on your own research and risk tolerance.
-Past performance is not indicative of future results. Bitcoin and cryptocurrencies are highly volatile and risky assets. Gold can also be volatile.
-""")
+Past performance is not indicative of future results. Bitcoin and cryptocurrencies are highly volatile and risky assets. Inverse ETFs like XSPS are complex and may not perform as expected.
+""") # updated disclaimer
