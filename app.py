@@ -81,7 +81,7 @@ def calculate_max_drawdown(cumulative_returns):
     max_drawdown = drawdown.min()
     return max_drawdown
 
-def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk-free rate = 0
+def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk_free_rate = 0
     excess_returns = returns - risk_free_rate / periods_per_year
     sharpe_ratio = np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
     return sharpe_ratio
@@ -180,12 +180,9 @@ for i in range(1, len(data)):
             'To Allocation': new_allocation
         })
         annotations.append(dict(
-                            x=pd.to_datetime(today.name), # Explicitly convert x to datetime
-                            y=float(cumulative_values_strategy[-1]), # Explicitly convert y to float
-                            xref="x", yref="y",
-                            hovertext=f"Switch to<br>{new_allocation}",  # Hover text only
-                            showarrow=False, # No arrow
-                            marker=dict(color='black', size=5))) # Black dot markers
+                            x=pd.to_datetime(today.name),  # Explicitly convert x to datetime
+                            y=float(cumulative_values_strategy[-1]),  # Explicitly convert y to float
+                            xref="x", yref="y")) # Minimal annotation - just x, y, xref, yref
         current_allocation = new_allocation # Update current allocation
     final_allocation = new_allocation # Update final allocation at each step, so last value after loop is final
 
