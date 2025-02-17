@@ -84,7 +84,7 @@ def calculate_max_drawdown(cumulative_returns):
     max_drawdown = drawdown.min()
     return max_drawdown
 
-def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk-free rate = 0
+def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk_free_rate = 0
     excess_returns = returns - risk_free_rate / periods_per_year
     sharpe_ratio = np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
     return sharpe_ratio
@@ -202,4 +202,107 @@ for i in range(1, len(data)):
     # Benchmark (100% BTC)
     benchmark_btc_returns.append(btc_return)
     portfolio_value_benchmark_btc *= (1 + btc_return)
-    cumulative_values_benchmark_btc.append(cumulative_value
+    cumulative_values_benchmark_btc.append(cumulative_values_benchmark_btc)
+
+    # Benchmark (100% Inverse ETF) # Inverse ETF Benchmark # use generic name
+    benchmark_inverse_etf_returns.append(inverse_etf_return) # Inverse ETF return # use generic name
+    portfolio_value_benchmark_inverse_etf *= (1 + inverse_etf_return) # Inverse ETF portfolio value # use generic name
+    cumulative_values_benchmark_inverse_etf.append(portfolio_value_benchmark_inverse_etf) # Inverse ETF cumulative values # use generic name
+
+
+cumulative_returns_strategy = pd.Series(cumulative_values_strategy, index=data.index)
+cumulative_returns_benchmark_spy = pd.Series(cumulative_values_benchmark_spy, index=data.index)
+cumulative_returns_benchmark_btc = pd.Series(cumulative_values_benchmark_btc, index=data.index)
+cumulative_returns_benchmark_inverse_etf = pd.Series(cumulative_values_benchmark_inverse_etf, index=data.index) # Inverse ETF cumulative returns # use generic name
+
+
+# --- Display Current Allocation Banner ---
+st.markdown(f"<h2 style='text-align: center; color: blue;'>Current Allocation: {final_allocation}</h2>", unsafe_allow_html=True)
+
+# --- Plotting ---
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=cumulative_returns_strategy.index, y=cumulative_returns_strategy,
+                         mode='lines', name='Customizable SPY/BTC/Inverse ETF MA Strategy')) # Inverse ETF in name # use generic name
+fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_spy.index, y=cumulative_returns_benchmark_spy,
+                         mode='lines', name='100% SPY Benchmark'))
+fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_btc.index, y=cumulative_returns_benchmark_btc,
+                         mode='lines', name='100% BTC Benchmark'))
+fig.add_trace(go.Scatter(x=cumulative_returns_benchmark_inverse_etf.index, y=cumulative_returns_benchmark_inverse_etf, # Inverse ETF benchmark trace # use generic name
+                         mode='lines', name=f"100% {inverse_etf_symbol} Benchmark")) # Inverse ETF benchmark name # use input ticker
+
+
+fig.update_layout(title='Cumulative Returns: Strategy vs Benchmarks with Allocation Switches',
+                  xaxis_title='Date',
+                  yaxis_title='Portfolio Value ($)',
+                  xaxis_rangeslider_visible=False,
+                  annotations=annotations) # Add annotations to the layout
+
+st.plotly_chart(fig, use_container_width=True)
+
+# --- Performance Summary Table ---
+st.subheader("Performance Metrics")
+
+strategy_daily_returns_series = pd.Series(strategy_returns[1:], index=data.index[1:]) # Daily returns series for Sharpe Ratio - sliced from index 1 to align
+benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns[1:], index=data.index[1:]) # sliced from index 1
+benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns[1:], index=data.index[1:]) # sliced from index 1
+benchmark_inverse_etf_daily_returns_series = pd.Series(benchmark_inverse_etf_returns[1:], index=data.index[1:]) # sliced from index 1 # Inverse ETF daily returns # use generic name
+
+
+performance_data = {
+    'Strategy': ['Customizable SPY/BTC/Inverse ETF MA Strategy', '100% SPY Benchmark', '100% BTC Benchmark', f"100% {inverse_etf_symbol} Benchmark"], # Inverse ETF in strategy name # use input ticker
+    'CAGR': [
+        calculate_cagr(cumulative_returns_strategy),
+        calculate_cagr(cumulative_returns_benchmark_spy),
+        calculate_cagr(cumulative_returns_benchmark_btc),
+        calculate_cagr(cumulative_returns_benchmark_inverse_etf) # Inverse ETF CAGR # use generic name
+    ],
+    'Max Drawdown': [
+        calculate_max_drawdown(cumulative_returns_strategy),
+        calculate_max_drawdown(cumulative_returns_benchmark_spy),
+        calculate_max_drawdown(cumulative_returns_benchmark_btc),
+        calculate_max_drawdown(cumulative_returns_benchmark_inverse_etf) # Inverse ETF Max Drawdown # use generic name
+    ],
+    'Sharpe Ratio': [
+        calculate_sharpe_ratio(strategy_daily_returns_series),
+        calculate_sharpe_ratio(benchmark_spy_daily_returns_series),
+        calculate_sharpe_ratio(benchmark_btc_daily_returns_series),
+        calculate_sharpe_ratio(benchmark_inverse_etf_daily_returns_series) # Inverse ETF Sharpe Ratio # use generic name
+    ]
+}
+
+performance_df = pd.DataFrame(performance_data)
+performance_df.set_index('Strategy', inplace=True) # Set Strategy as index for better display
+st.dataframe(performance_df.style.format({ # Format as percentages and rounded Sharpe Ratio
+    'CAGR': '{:.2%}',
+    'Max Drawdown': '{:.2%}',
+    'Sharpe Ratio': '{:.2f}'
+}))
+
+# --- Trade Table ---
+st.subheader("Allocation Switches (Trades)")
+if trades_data:
+    trades_df = pd.DataFrame(trades_data)
+    st.dataframe(trades_df)
+else:
+    st.info("No allocation switches occurred within the selected date range.")
+
+
+# --- Final Portfolio Value Summary ---
+st.subheader("Final Portfolio Value")
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Customizable SPY/BTC/Inverse ETF MA Strategy", value=f"${portfolio_value_strategy:,.2f}") # Inverse ETF in metric # use generic name
+with col2:
+    st.metric("100% SPY Benchmark", value=f"${portfolio_value_benchmark_spy:,.2f}")
+with col3:
+    st.metric("100% BTC Benchmark", value=f"${portfolio_value_benchmark_btc:,.2f}")
+with col4:
+    st.metric(f"100% {inverse_etf_symbol} Benchmark", value=f"${portfolio_value_benchmark_inverse_etf:,.2f}") # Inverse ETF benchmark metric # use input ticker
+
+
+st.sidebar.markdown(f"""
+---
+**Disclaimer:** This is for educational purposes only and not financial advice.
+Investment decisions should be based on your own research and risk tolerance.
+Past performance is not indicative of future results. Bitcoin and cryptocurrencies are highly volatile and risky assets. Inverse ETFs like {inverse_etf_symbol} are complex and may not perform as expected.
+""") # updated disclaimer - use input ticker
