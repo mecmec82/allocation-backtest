@@ -179,7 +179,10 @@ for i in range(1, len(data)):
             'From Allocation': current_allocation,
             'To Allocation': new_allocation
         })
-        annotations.append(dict(x=today.name, y=cumulative_values_strategy[-1], xref="x", yref="y",
+        annotations.append(dict(
+                            x=pd.to_datetime(today.name), # Explicitly convert x to datetime
+                            y=float(cumulative_values_strategy[-1]), # Explicitly convert y to float
+                            xref="x", yref="y",
                             hovertext=f"Switch to<br>{new_allocation}",  # Hover text only
                             showarrow=False, # No arrow
                             marker=dict(color='black', size=5))) # Black dot markers
@@ -241,7 +244,7 @@ st.subheader("Performance Metrics")
 
 strategy_daily_returns_series = pd.Series(strategy_returns, index=data.index[1:]) # Daily returns series for Sharpe Ratio
 benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns, index=data.index[1:])
-benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data.index[1:])
+benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_daily_returns_series, index=data.index[1:])
 benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns, index=data.index[1:])
 
 
