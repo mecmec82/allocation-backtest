@@ -18,10 +18,13 @@ if date_option == "Specific Dates":
     end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 else:
     relative_period = st.sidebar.selectbox("Relative Period",
-                                          ["Last 30 Days", "Last 90 Days", "Year to Date", "Last Year", "Last 5 Years"])
+                                          ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "Last Year", "Last 5 Years"])
     today = date.today()
     if relative_period == "Last 30 Days":
         start_date = today - timedelta(days=30)
+        end_date = today
+    elif relative_period == "Last 60 Days":
+        start_date = today - timedelta(days=60)
         end_date = today
     elif relative_period == "Last 90 Days":
         start_date = today - timedelta(days=90)
@@ -164,7 +167,8 @@ for i in range(1, len(data)):
         })
         annotations.append(dict(x=today.name, y=cumulative_values_strategy[-1], xref="x", yref="y",
                             hovertext=f"Switch to<br>{new_allocation}",  # Hover text only
-                            showarrow=False, arrowhead=1, arrowcolor="blue", bgcolor="white")) # No text on chart
+                            text="Trade",
+                            showarrow=True, arrowhead=1, arrowcolor="blue", bgcolor="white")) # No text on chart
         current_allocation = new_allocation # Update current allocation
     final_allocation = new_allocation # Update final allocation at each step, so last value after loop is final
 
