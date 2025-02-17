@@ -167,8 +167,7 @@ for i in range(1, len(data)):
         })
         annotations.append(dict(x=today.name, y=cumulative_values_strategy[-1], xref="x", yref="y",
                             hovertext=f"Switch to<br>{new_allocation}",  # Hover text only
-                            text="Trade",
-                            showarrow=false )) # No text on chart
+                            text="Trade" )) # No text on chart
         current_allocation = new_allocation # Update current allocation
     final_allocation = new_allocation # Update final allocation at each step, so last value after loop is final
 
