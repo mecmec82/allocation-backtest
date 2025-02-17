@@ -81,7 +81,7 @@ def calculate_max_drawdown(cumulative_returns):
     max_drawdown = drawdown.min()
     return max_drawdown
 
-def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk_free_rate = 0
+def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252): # Assuming daily returns, risk-free rate = 0
     excess_returns = returns - risk_free_rate / periods_per_year
     sharpe_ratio = np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
     return sharpe_ratio
@@ -193,16 +193,19 @@ for i in range(1, len(data)):
 
     # Benchmark (100% SPY)
     benchmark_spy_returns.append(spy_return)
+    benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_spy *= (1 + spy_return)
     cumulative_values_benchmark_spy.append(portfolio_value_benchmark_spy)
 
     # Benchmark (100% BTC)
     benchmark_btc_returns.append(btc_return)
+    benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_btc *= (1 + btc_return)
     cumulative_values_benchmark_btc.append(portfolio_value_benchmark_btc)
 
     # Benchmark (100% GLD)
     benchmark_gld_returns.append(gld_return)
+    benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns, index=data.index[1:]) # moved here
     portfolio_value_benchmark_gld *= (1 + gld_return)
     cumulative_values_benchmark_gld.append(portfolio_value_benchmark_gld)
 
@@ -240,9 +243,6 @@ st.plotly_chart(fig, use_container_width=True)
 st.subheader("Performance Metrics")
 
 strategy_daily_returns_series = pd.Series(strategy_returns, index=data.index[1:]) # Daily returns series for Sharpe Ratio
-benchmark_spy_daily_returns_series = pd.Series(benchmark_spy_returns, index=data.index[1:])
-benchmark_btc_daily_returns_series = pd.Series(benchmark_btc_daily_returns_series, index=data.index[1:])
-benchmark_gld_daily_returns_series = pd.Series(benchmark_gld_returns, index=data.index[1:])
 
 
 performance_data = {
